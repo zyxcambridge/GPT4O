@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>起居注</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: rgba(0, 0, 0, 0.21); /* Fully opaque white background */
+        margin: 0;
+        padding: 5px;
+        text-align: left;
+      }
+      .draggable {
+        -webkit-app-region: drag;
+        cursor: move;
+      }
+      #analysis {
+        color: #333; /* Text color */
+        padding: 10px 10px 30px 10px;
+        margin-top: 5px;
+        padding: 5px;
+        font-size: 12px;
+      }
+      .window-message {
+        //color: #333; /* Text color for the message */
+        color: white; /* Text color for the message */
+        padding-top: 2px; /* Space between the title and the message */
+      }
+      .message-time{
+          position: fixed;
+          bottom: 25px;
+          right: 5px;
+          color:white;
+      }
+      .left-icon{
+          position: fixed;
+          bottom: 5px;
+          left: 5px;
+          font-size: 20px;
+          font-weight: bold;
+          color: white;
+      }
+      .right-button {
+          position: fixed;
+          bottom: 5px;
+          right: 5px;
+          font-size: 15px;
+          font-weight: bold;
+          color: white;
+      }
+    </style>
+      <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  </head>
+  <body>
+    <div class="draggable" id="app">
+      <div id="analysis" class="draggable">
+          <div class="window-message"></div>
+<!--          <div class="message-time">2022/12/12</div>-->
+          <div class="message-time"></div>
+          <i class="el-icon-time left-icon"></i>
+          <span class="right-button">
+              <i class="el-icon-arrow-right"></i>
+              <i class="el-icon-arrow-right"></i>
+              回顾来源
+          </span>
+      </div>
+      <script src="notificationRenderer.js"></script>
+
+    </div>
+  </body>
+  <!-- import Vue before Element -->
+  <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+  <!-- import JavaScript -->
+  <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+  <script>
+      new Vue({
+          el: '#app',
+          data: function() {
+              return { visible: false }
+          }
+      })
+  </script>
+</html>

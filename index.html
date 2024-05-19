@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>起居注</title>
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+        font-size: 14px;
+      }
+      h1 {
+        color: #333;
+        font-size: 18px;
+      }
+      #analysis {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: white;
+        border: 1px solid #ddd;
+      }
+      .window-section {
+        background-color: white;
+        border: 1px solid #ddd;
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 5px;
+      }
+
+      .window-section h3 {
+        margin-top: 0;
+        color: #40005e;
+      }
+      .window-message {
+        color: #333;
+        padding-top: 2px;
+      }
+      .hidden {
+        display: none;
+      }
+
+      .modal {
+        display: none; /* Hidden by default */
+        position: fixed; /* Stay in place */
+        z-index: 1; /* Sit on top */
+        left: 0;
+        top: 0;
+        width: 100%; /* Full width */
+        height: 100%; /* Full height */
+        overflow: auto; /* Enable scroll if needed */
+        background-color: rgb(0, 0, 0); /* Fallback color */
+        background-color: rgba(0, 0, 0, 0.4); /* Black w/ opacity */
+      }
+
+      /* Modal Content/Box */
+      .modal-content {
+        background-color: #fefefe;
+        margin: 15% auto; /* 15% from the top and centered */
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%; /* Could be more or less, depending on screen size */
+      }
+
+      /* The Close Button */
+      .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+      }
+
+      .close:hover,
+      .close:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .modal-row {
+        display: flex;
+        align-items: center; /* Align items vertically */
+        justify-content: space-between; /* Spreads out the label and input */
+        margin-bottom: 10px; /* Adds some space below the row */
+        margin-left: 10px;
+      }
+
+      #api-key-input {
+        width: 50%; /* Adjust width as needed */
+        /* other styles if needed */
+        margin-left: 10px;
+      }
+
+      /* Label for the API key */
+      .modal-row {
+        display: flex;
+        align-items: center;
+        justify-content: start; /* Align to the start of the flex container */
+      }
+    </style>
+  </head>
+  <body>
+    <div style="position: absolute; top: 5px; right: 5px">
+      <a href="#" id="settingsIcon"
+        ><img
+          src="./assets/settings-icon.png"
+          width="25"
+          height="25"
+          style="opacity: 0.6"
+      /></a>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <div class="modal-row">
+          <label for="api-key-input">OpenAI API-key:</label>
+          <input
+            type="text"
+            id="api-key-input"
+            class="modal-api-key-input"
+            placeholder="Enter API Key"
+          />
+        </div>
+        <div class="version-text">v0.1</div>
+      </div>
+    </div>
+    <div id="analysis"></div>
+    <video id="video" width="320" height="240" controls></video>
+    <button id="save-button">保存视频</button>
+
+    <script src="renderer.js"></script>
+    <script>
+      // document.getElementById('startRecording').addEventListener('click', async () => {
+        // const result = await ipcRenderer.invoke('video-start-recording');
+        // console.log(result)
+        const videoElement = document.querySelector('video');
+        if (navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ video: true })
+                  .then(stream => {
+                    videoElement.srcObject = stream;
+                    videoElement.play();
+                  })
+                  .catch(error => {
+                    console.error(error);
+                  });
+        } else {
+          console.error('getUserMedia is not supported in this browser');
+        }
+
+
+      document.getElementById('save-button').addEventListener('click', async () => {
+        const videoElement = document.querySelector('video');
+        console.log("摄像头正在录制...")
+        if (videoElement && videoElement.srcObject) {
+          console.log("摄像头正在录制...")
+          const stream = videoElement.srcObject;
+          const recorder = new MediaRecorder(stream);
+          let recordedChunks = [];
+
+          // 开始录制，并将录制的数据保存在 recordedChunks 数组中
+          recorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+              recordedChunks.push(event.data);
+            } else {
+              // ...
+            }
+          };
+
+          recorder.start();
+          console.log("开始录制。。。")
+          // 停止录制，你可以设置一个定时器或者其他触发条件来停止录制
+          // 这里为了简单起见，我们在录制几秒钟后停止
+          setTimeout(() => {
+            recorder.stop();
+          }, 5000); // 录制5秒钟
+          console.log("开始录制。。。")
+          // 等待录制结束
+          await new Promise(resolve => {
+            recorder.onstop = resolve;
+          });
+
+          // 将录制的数据转换为 Blob 对象
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+
+          // 通过 Electron 的 ipcRenderer 发送数据到主进程保存文件
+          ipcRenderer.send('save-video', blob);
+        } else {
+          console.error('No video stream found.');
+        }
+      });
+
+      var modal = document.getElementById("settingsModal");
+      var btn = document.getElementById("settingsIcon");
+
+      btn.onclick = function () {
+        modal.style.display = "block";
+      };
+
+      var btn = document.getElementById("settingsIcon");
+
+      // Get the <span> element that closes the modal
+      var span = document.getElementsByClassName("close")[0];
+      span.onclick = function () {
+        modal.style.display = "none";
+      };
+
+      window.onclick = function (event) {
+        if (event.target == modal) {
+          modal.style.display = "none";
+        }
+      };
+
+      const apiKeyInput = document.getElementById("api-key-input");
+
+      function maskApiKey(apiKey) {
+        if (apiKey.length <= 4) {
+          return apiKey; // If the key is too short, just return it
+        }
+        return "*".repeat(apiKey.length - 4) + apiKey.slice(-4);
+      }
+
+      apiKeyInput.addEventListener("input", () => {
+        const apiKey = apiKeyInput.value;
+        ipcRenderer.send("submit-api-key", apiKey); // Send the full API key to main process
+        apiKeyInput.value = maskApiKey(apiKey); // Mask the API key in the input field
+      });
+
+      ipcRenderer.send("request-api-key");
+
+      // Handle receiving the masked API key
+      ipcRenderer.on("send-api-key", (event, maskedApiKey) => {
+        apiKeyInput.value = maskedApiKey; // Display the masked API key
+      });
+    </script>
+  </body>
+</html>
