@@ -44,3 +44,23 @@ openai.baseURL = "https://api.aiproxy.io/v1"
 yarn start
 
 ```
+
+### Turn it into an .app with Electron
+
+Want to create an .app executable instead of running this from your terminal?
+
+First go to `index.js` and change `const useElectronPackager` from `false` to `true`.
+
+Run one of these in your terminal, depending on which platform you're on.
+
+```bash
+npm  run  package-mac
+npm  run  package-win
+npm  run  package-linux
+```
+
+Note I have only tested this on Mac (Apple silicon and Intel).
+
+Go to `/release-builds/` in your project folder, and chose the folder of your platform. In there is an executable, `.app` if you're on Mac. Double-click it to open the app, note that it may take a few seconds the first time so be patient.
+
+Once the app is opened, trigger your keyboard shortcut. You'll be asked to grant Privacy & Security permissions. You may need to repeat this another one or two times for all permissions to work properly, and to restart the app.

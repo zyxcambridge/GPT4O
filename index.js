@@ -85,7 +85,7 @@ fs.readFile(conversationHistoryPath, 'utf8', (err, data) => {
 
 
 // Set to true if you intend to package the app, otherwise false.
-const useElectronPackager = false;
+const useElectronPackager = true;
 let tempFilesDir;
 // This decides what directory/storage strategy to use (local project or application folder)
 if (useElectronPackager) {
