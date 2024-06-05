@@ -1,14 +1,8 @@
-///////////////////////Todolist///////////////////////
-// 修改代码，输出修改后代码，详细注释
-// https://lmdeploy.readthedocs.io/zh-cn/latest/serving/api_server_vl.html  
-// 增加功能：
-  // 1.自动录制1个小时的录音，持续录屏一个小时
-  // 2.然后自动弹出分析后的结果
-  // 3.实时分析电脑的屏幕，尤其是桌面，以及鼠标和键盘的点击和移动
-  // 4.分析外接的摄像头的信息
-  // 5.连续分析，增加打断的功能
-///////////////////////Todolist///////////////////////
+/** 
+### TodoList.md #########
+  // 增加倒计时record_time_interval5分钟的设定
 
+*/
 const {
   app,
   BrowserWindow,
@@ -37,18 +31,19 @@ ffmpeg.setFfmpegPath(ffmpegStatic);
 let openAiApiKey = store.get("userApiKey", "");
 // openAiApiKey="sk-"
 
-
 // OpenAI.baseURL = "http://localhost:1234/v1"
 // UserDefineModels = "Repository/Yi-VL-34B-GGUF"
 
 OpenAI.baseURL = "https://api.aiproxy.io/v1"
-UserDefineModels ="gpt-4-vision-preview"
+UserDefineModels ="gpt-4o"
 openAiApiKey_aiproxy="sk-"
 openai_whisper_tts_base = "https://api.aiproxy.io/v1/"
 let openai = new OpenAI({
   apiKey: openAiApiKey_aiproxy,
 });
 openai.baseURL = "https://api.aiproxy.io/v1"
+// - 间隔时间可以配置,默认5分钟，300000 是5*60秒 // 将时间转换为毫秒
+let record_time_interval = store.get("record_time_interval", 1*60*1000);
 
 // OpenAI.baseURL = "https://api.openai.com/v1"
 // UserDefineModels ="gpt-4-vision-preview"
@@ -63,7 +58,8 @@ openai.baseURL = "https://api.aiproxy.io/v1"
 
 
 // This is the keyboard shortcut that triggers the app
-const keyboardShortcut = "CommandOrControl+Shift+'"; 
+// command + space
+const keyboardShortcut = "CommandOrControl+Shift+space"; 
 // 定义一个变量来控制播放状态
 let isPlayingTTS = false;
 const notificationWidth = 300; 
@@ -390,15 +386,18 @@ async function playVisionApiResponse(inputText) {
           console.error("Unsupported platform for audio playback");
           return;
       }
-      isPlayingTTS = true;
-      exec(playCommand, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Error playing audio: ${error.message}`);
-          return;
-        }
-        isPlayingTTS = false;
-        resolve();
-      });
+      if(isPlayingTTS)
+      {
+        exec(playCommand, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error playing audio: ${error.message}`);
+            return;
+          }
+          isPlayingTTS = false;
+          resolve();
+        });
+      }
+
     });
     writer.on("error", reject);
 
@@ -416,75 +415,58 @@ async function playVisionApiResponse(inputText) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Manage API key storage/access
-ipcMain.on("submit-api-key", (event, apiKey) => {
-  store.set("userApiKey", apiKey); // Directly saving the API key using electron-store
-});
 
-// Function to mask the API key except for the last 4 characters
-function maskApiKey(apiKey) {
-  if (apiKey.length <= 4) {
-    return apiKey; // If the key is too short, just return it
+// 假设 registerKeyboardShortcut 是一个函数，用于注册并触发快捷键
+async function registerKeyboardShortcut() {
+  // 这里是模拟的触发快捷键的代码
+  console.log('Keyboard shortcut triggered');
+  // 在这里添加触发快捷键后要执行的代码
+  if (!isRecording) {
+    try {
+      const activeWindow = await activeWin();
+      captureWindowStatus = await captureWindow(activeWindow.title);
+      repositionNotificationWindow(activeWindow);
+
+      if (captureWindowStatus !== "Window found") {
+        const responseMessage = "Unable to capture this window, try another.";
+        mainWindow.webContents.send("add-window-name-to-app", responseMessage);
+        notificationWindow.webContents.send("add-window-name-to-app", responseMessage);
+        return;
+      }
+
+      // If window is found, continue as expected
+      const responseMessage = `${activeWindow.owner.name}: ${activeWindow.title}`;
+      mainWindow.webContents.send("add-window-name-to-app", responseMessage);
+      notificationWindow.webContents.send("add-window-name-to-app", responseMessage);
+    } catch (error) {
+      console.error("Error capturing the active window:", error);
+    }
+    mainWindow.webContents.send("start-recording");
+    notificationWindow.webContents.send("start-recording");
+
+    mainWindow.webContents.send("start-recording-video");
+    // notificationWindow.webContents.send("start-recording-video");
+    isRecording = true;
+    // 中断播放
+    if (isPlayingTTS) {
+      // 中断播放
+      exec("killall afplay", (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error stopping audio: ${error.message}`);
+          return;
+        }
+        isPlayingTTS = false;
+      });
+    }
+  } else {
+    // 5分钟后自动执行这个
+    mainWindow.webContents.send("stop-recording");
+    notificationWindow.webContents.send("stop-recording");
+    mainWindow.webContents.send("stop-recording-video");
+    // notificationWindow.webContents.send("stop-recording-video");
+    isRecording = false;
   }
-  return "*".repeat(apiKey.length - 4) + apiKey.slice(-4);
 }
-
-// Handle request for API key
-ipcMain.on("request-api-key", (event) => {
-  const apiKey = store.get("userApiKey", ""); // Get the API key
-  const maskedApiKey = maskApiKey(apiKey); // Get the masked version
-  event.reply("send-api-key", maskedApiKey); // Send the masked key
-});
-
-// fetch the key to send to backend logic
-ipcMain.handle("get-api-key", (event) => {
-  return store.get("userApiKey", "");
-});
-
-ipcMain.on("video-buffer", (event, buffer) => {
-  // const outputPath = path.resolve(__dirname, 'recording.webm'); // 设置输出路径
-  fs.writeFile(videoFilePath, buffer, (err) => {
-    // 将视频数据写入文件
-    if (err) {
-      console.error("Error saving video file:", err);
-    } else {
-      console.log("Video saved to:", videoFilePath);
-    }
-  });
-});
-
-ipcMain.on("save-video-frame", (event, buffer) => {
-  const outputFramePath = path.join(tempFilesDir, `frame_${Date.now()}.png`); // 自定义保存路径和文件名，这里保存为 PNG 图片文件，你可以根据需要修改为其他格式或处理方式
-  fs.writeFile(outputFramePath, buffer, (err) => {
-    // 将视频数据写入文件
-    if (err) {
-      console.error("Error saving video file:", err);
-    } else {
-      // 将帧数据写入文件
-      console.log(`saved to ${outputFramePath}`); // 输出保存路径和帧编号，便于调试和跟踪录制状态和进度
-    }
-  });
-});
-ipcMain.on("save-video", async (event, blob) => {
-  try {
-    // 将 Blob 对象转换为 ArrayBuffer
-    const arrayBuffer = await blob.arrayBuffer();
-    // 将 ArrayBuffer 转换为 Buffer
-    const buffer = Buffer.from(arrayBuffer);
-    // 定义输出路径，文件名使用当前时间戳来保证唯一性
-    const outputPath = path.join(tempFilesDir, `video_${Date.now()}.webm`);
-    // 使用 fs.writeFileSync 同步写入文件，也可以使用 fs.writeFile 异步写入
-    fs.writeFileSync(outputPath, buffer);
-    // 可选：回复渲染进程文件已保存的消息和路径
-    event.reply("video-saved", outputPath);
-    console.log(`Video saved to: ${outputPath}`);
-  } catch (error) {
-    console.error("Error saving video:", error);
-    // 可选：回复渲染进程保存视频时发生的错误
-    event.reply("video-save-error", error);
-  }
-});
-
 // Run when Electron app is ready
 app.whenReady().then(() => {
   createMainWindow();
@@ -514,67 +496,26 @@ app.whenReady().then(() => {
     }
   });
   // This call initializes MediaRecorder with an 500ms audio recording, to get around an issue seen on some machines where the first user-triggered recording doesn't work.
+
   mainWindow.webContents.send("init-mediaRecorder");
   // If defined keyboard shortcut is triggered then run
+
   globalShortcut.register(keyboardShortcut, async () => {
     // If the microphone recording isn't already running
-    if (!isRecording) {
-      try {
-        const activeWindow = await activeWin();
-        captureWindowStatus = await captureWindow(activeWindow.title);
-        repositionNotificationWindow(activeWindow);
-
-        // If captureWindow() can't find the selected window, show an error and exit the process
-        if (captureWindowStatus != "Window found") {
-          const responseMessage = "Unable to capture this window, try another.";
-          mainWindow.webContents.send(
-            "add-window-name-to-app",
-            responseMessage
-          );
-          notificationWindow.webContents.send(
-            "add-window-name-to-app",
-            responseMessage
-          );
-          return;
-        }
-
-        // If window is found, continue as expected
-        const responseMessage = `${activeWindow.owner.name}: ${activeWindow.title}`;
-        mainWindow.webContents.send("add-window-name-to-app", responseMessage);
-        notificationWindow.webContents.send(
-          "add-window-name-to-app",
-          responseMessage
-        );
-      } catch (error) {
-        console.error("Error capturing the active window:", error);
-      }
-      mainWindow.webContents.send("start-recording");
-      notificationWindow.webContents.send("start-recording");
-
-      mainWindow.webContents.send("start-recording-video");
-      // notificationWindow.webContents.send("start-recording-video");
-      isRecording = true;
-      // 中断播放
-      if (isPlayingTTS) {
-        // 中断播放
-        exec("killall afplay", (error, stdout, stderr) => {
-          if (error) {
-            console.error(`Error stopping audio: ${error.message}`);
-            return;
-          }
-          isPlayingTTS = false;
-        });
-      }
-    } else {
-      // If we're already recording, the keyboard shortcut means we should stop
-      mainWindow.webContents.send("stop-recording");
-      notificationWindow.webContents.send("stop-recording");
-      mainWindow.webContents.send("stop-recording-video");
-      // notificationWindow.webContents.send("stop-recording-video");
-      isRecording = false;
-    }
+    console.log(`start to record ,
+          默认录制音频record_time_interval5分钟，
+          完成一次语音识别，请求一次分析结果，`);
+    await registerKeyboardShortcut();
   });
-
+  // 模拟每5分钟触发一次键盘快捷键
+  setInterval(async () => {
+    if (isRecording) {
+      console.log("5分钟到了，自动停止录音");
+      await registerKeyboardShortcut();
+    }
+  }, record_time_interval );
+  // 如果你想要只触发一次，可以使用 setTimeout 并在其中调用 registerKeyboardShortcut
+  // setTimeout(registerKeyboardShortcut, record_time_interval);
   ipcMain.handle("video-start-recording", async () => {
     console.log("video-start-recording");
     try {
